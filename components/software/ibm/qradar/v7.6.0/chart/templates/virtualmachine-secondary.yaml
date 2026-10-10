@@ -18,32 +18,18 @@ spec:
       name: qradar-secondary-rootdisk
     spec:
       source:
-        pvc:
-          namespace: {{ .Values.storage.mediaNamespace }}
-          name: {{ .Values.storage.goldenImagePvc }}
+        registry:
+          url: "docker://{{ .Values.storage.goldenDisk.image }}"
+          secretRef: {{ .Values.storage.cdiPullSecret }}
       storage:
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ $sizing.storageGb }}Gi
+            storage: {{ .Values.storage.goldenDisk.size }}
+        {{- if .Values.storage.storageClassName }}
         storageClassName: {{ .Values.storage.storageClassName }}
-  - apiVersion: cdi.kubevirt.io/v1beta1
-    kind: DataVolume
-    metadata:
-      name: qradar-secondary-installation-cdrom
-    spec:
-      source:
-        pvc:
-          namespace: {{ .Values.storage.mediaNamespace }}
-          name: {{ .Values.storage.isoPvc }}
-      storage:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: {{ .Values.storage.isoStorageGb }}Gi
-        storageClassName: {{ .Values.storage.storageClassName }}
+        {{- end }}
   template:
     metadata:
       labels:
@@ -121,8 +107,9 @@ spec:
       - dataVolume:
           name: qradar-secondary-rootdisk
         name: rootdisk
-      - dataVolume:
-          name: qradar-secondary-installation-cdrom
+      - containerDisk:
+          image: {{ .Values.storage.installationIso.image }}
+          imagePullSecret: {{ .Values.storage.imagePullSecret }}
         name: installation-cdrom
       - cloudInitNoCloud:
           secretRef:

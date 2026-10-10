@@ -1,0 +1,6 @@
+# BYOP batch import product list
+# Format: <product_name> [vX.X.X]
+# Version is optional — latest is selected automatically when omitted.
+
+apache-kafka  v4.0.0
+mariadb v12.3.2

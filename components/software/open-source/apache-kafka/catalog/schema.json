@@ -4,49 +4,32 @@
   "title": "Apache Kafka Instance Parameters",
   "description": "Parameters for provisioning an Apache Kafka distributed event-streaming instance",
   "properties": {
-    "cluster_url": {
-      "type": "string",
-      "description": "Target cluster server URL (optional, defaults to broker's cluster). Must be a registered ArgoCD cluster.",
-      "format": "uri",
-      "pattern": "^https://.*",
-      "examples": [
-        "https://kubernetes.default.svc",
-        "https://192.168.2.89:6443",
-        "https://192.168.2.90:6443"
-      ]
-    },
-    "replica_count": {
-      "type": "integer",
-      "description": "Number of Kafka broker replicas",
-      "minimum": 1,
-      "maximum": 10,
-      "default": 1,
-      "examples": [1, 3]
-    },
-    "client_password": {
-      "type": "string",
-      "description": "SASL/SCRAM password for the default Kafka client user (auto-generated if not provided)",
-      "minLength": 12,
-      "maxLength": 128,
-      "examples": ["SecureKafka@Pass1"],
-      "x-generate": {
-        "type": "password",
-        "length": 32,
-        "include": "alphanumeric-symbols"
-      }
-    },
-    "inter_broker_password": {
-      "type": "string",
-      "description": "SASL/SCRAM password for inter-broker communication (auto-generated if not provided)",
-      "minLength": 12,
-      "maxLength": 128,
-      "x-generate": {
-        "type": "password",
-        "length": 32,
-        "include": "alphanumeric-symbols"
-      }
-    }
+    "clusterTarget":                       {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$"},
+    "namespace":                           {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$", "minLength": 1, "maxLength": 64, "default": "kafka"},
+    "controller.replicaCount":             {"type": "integer", "default": 3, "minimum": 1},
+    "controller.heapOpts":                 {"type": "string",  "default": "-Xmx1024m -Xms1024m"},
+    "controller.resourcesPreset":          {"type": "string",  "default": "small"},
+    "controller.persistence.enabled":      {"type": "boolean", "default": true},
+    "controller.persistence.size":         {"type": "string",  "default": "8Gi"},
+    "controller.persistence.storageClass": {"type": "string",  "default": ""},
+    "broker.replicaCount":                 {"type": "integer", "default": 0, "minimum": 0},
+    "broker.resourcesPreset":              {"type": "string",  "default": "small"},
+    "broker.persistence.enabled":          {"type": "boolean", "default": true},
+    "broker.persistence.size":             {"type": "string",  "default": "8Gi"},
+    "broker.persistence.storageClass":     {"type": "string",  "default": ""},
+    "listeners.client.protocol":           {"type": "string",  "default": "SASL_PLAINTEXT"},
+    "listeners.external.protocol":         {"type": "string",  "default": "SASL_PLAINTEXT"},
+    "sasl.enabledMechanisms":              {"type": "string",  "default": "PLAIN,SCRAM-SHA-256,SCRAM-SHA-512"},
+    "sasl.client.users":                   {"type": "string",  "default": "user1"},
+    "sasl.client.passwords":               {"type": "string",  "default": ""},
+    "service.type":                        {"type": "string",  "default": "ClusterIP"},
+    "externalAccess.enabled":              {"type": "boolean", "default": false},
+    "metrics.jmx.enabled":                {"type": "boolean", "default": false},
+    "provisioning.enabled":               {"type": "boolean", "default": false},
+    "provisioning.replicationFactor":     {"type": "integer", "default": 1, "minimum": 1},
+    "provisioning.numPartitions":         {"type": "integer", "default": 1, "minimum": 1},
+    "global.imageRegistry":               {"type": "string",  "default": ""},
+    "global.defaultStorageClass":         {"type": "string",  "default": ""}
   },
-  "required": [],
-  "additionalProperties": false
+  "required": ["clusterTarget", "namespace"]
 }

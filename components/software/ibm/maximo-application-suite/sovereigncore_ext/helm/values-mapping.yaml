@@ -1,0 +1,19 @@
+# Sovereign Core operator-pattern mapping for IBM Maximo Application Suite v9.2.
+# MAS is deployed via the IBM MAS CLI install Job (not a standalone Helm chart).
+# The CLI drives the IBM MAS operator catalog (oci://icr.io/cpopen/ibm-operator-catalog:v9-260918-amd64)
+# to install the MAS Suite operator and, for the core-manage plan, Maximo Manage + Db2 Warehouse.
+# This mapping records the platform values injected into the MAS install-env ConfigMap at provision time.
+apiVersion: sovereign-catalog.io/v1alpha1
+kind: SovereignCoreHelmMapping
+metadata:
+  softwareRef: "components/software/ibm/maximo-application-suite"
+  companyRef: "companies/ibm"
+spec:
+  chart:
+    repository: "oci://icr.io/cpopen/ibm-operator-catalog"
+    version: "v9-260918-amd64"
+  platformValueMappings:
+    global.storageClass: "{{ .SovereignCore.StorageClass }}"
+    global.storageClassRWX: "{{ .SovereignCore.StorageClassRWX }}"
+    global.tlsSecretName: "{{ .SovereignCore.TLSSecretName }}"
+    mas.namespace: "{{ .SovereignCore.TenantNamespace }}"

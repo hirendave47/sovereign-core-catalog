@@ -59,7 +59,3 @@ spec:
   links:
     docsUrl: "https://kafka.apache.org/documentation/"
     productPageUrl: "https://kafka.apache.org"
-brokerType: platform
-sourceType: helm-registry # if no chart dir, requires sourceRepo and sourcePath
-sourceRepo: oci://registry-1.docker.io/bitnamicharts/kafka
-name: kafka

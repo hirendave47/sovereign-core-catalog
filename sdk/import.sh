@@ -43,8 +43,19 @@ EXT_CATALOG_REPO="${EXT_CATALOG_REPO:-}"
 EXT_CATALOG_BRANCH="${EXT_CATALOG_BRANCH:-main}"
 EXT_CATALOG_PREFIX="${EXT_CATALOG_PREFIX:-}"
 
+# Step enable flags — set any to 'false' in import.env or on the command line to skip that step
+# e.g. STEP3_PUSH_CHART=false ./import.sh mariadb
+STEP1_CLONE_CATALOG_ARTIFACTS="${STEP1_CLONE_CATALOG_ARTIFACTS:-true}"
+STEP2_PULL_CHART="${STEP2_PULL_CHART:-true}"
+STEP3_PUSH_CHART="${STEP3_PUSH_CHART:-true}"
+STEP4_MIRROR_IMAGES="${STEP4_MIRROR_IMAGES:-true}"
+STEP5_CREATE_BYOP_TEMPLATE="${STEP5_CREATE_BYOP_TEMPLATE:-true}"
+STEP6_CREATE_PLATFORM_OWNER_SECRET="${STEP6_CREATE_PLATFORM_OWNER_SECRET:-true}"
+STEP7_REGISTER_TARGET_REPO="${STEP7_REGISTER_TARGET_REPO:-true}"
+STEP8_CREATE_ACM_PLACEMENT_RESOURCES="${STEP8_CREATE_ACM_PLACEMENT_RESOURCES:-true}"
+
 # Required keys
-for var in QUAY_USERNAME QUAY_PASSWORD SOVEREIGN_CORE_APIKEY; do
+for var in QUAY_USERNAME QUAY_PASSWORD; do
   [[ -z "${!var:-}" ]] && { echo "ERROR: $var must be set in import.env"; exit 1; }
 done
 [[ -z "$EXT_CATALOG_REPO" ]] && { echo "ERROR: EXT_CATALOG_REPO must be set in import.env"; exit 1; }
@@ -57,24 +68,48 @@ for tool in git helm skopeo oc yq base64; do
 done
 
 # ---------------------------------------------------------------------------
-# Look up Quay hostname from cluster
+# Resolve Quay hostname — use QUAY_REGISTRY override if set, otherwise look up from cluster
 # ---------------------------------------------------------------------------
-echo "==> Looking up Quay registry from cluster"
-QUAY_REGISTRY=$(oc get quayregistry registry -n quay-enterprise \
-  -o jsonpath='{.status.registryEndpoint}' 2>/dev/null || true)
-[[ -z "$QUAY_REGISTRY" ]] && { echo "ERROR: could not retrieve Quay registryEndpoint from quay-enterprise namespace"; exit 1; }
-# Strip scheme — helm and skopeo expect a bare hostname
-QUAY_REGISTRY="${QUAY_REGISTRY#https://}"
-QUAY_REGISTRY="${QUAY_REGISTRY#http://}"
-echo "    QUAY_REGISTRY=${QUAY_REGISTRY}"
+if [[ -n "${QUAY_REGISTRY:-}" ]]; then
+  # Strip scheme if the override includes one
+  QUAY_REGISTRY="${QUAY_REGISTRY#https://}"
+  QUAY_REGISTRY="${QUAY_REGISTRY#http://}"
+  echo "==> Using QUAY_REGISTRY override: ${QUAY_REGISTRY}"
+else
+  echo "==> Looking up Quay registry from cluster"
+  QUAY_REGISTRY=$(oc get quayregistry registry -n quay-enterprise \
+    -o jsonpath='{.status.registryEndpoint}' 2>/dev/null || true)
+  [[ -z "$QUAY_REGISTRY" ]] && { echo "ERROR: could not retrieve Quay registryEndpoint from quay-enterprise namespace; set QUAY_REGISTRY in import.env to override"; exit 1; }
+  # Strip scheme — helm and skopeo expect a bare hostname
+  QUAY_REGISTRY="${QUAY_REGISTRY#https://}"
+  QUAY_REGISTRY="${QUAY_REGISTRY#http://}"
+  echo "    QUAY_REGISTRY=${QUAY_REGISTRY}"
+fi
+
+# ---------------------------------------------------------------------------
+# Working directory — always created so later steps can write temp files
+# ---------------------------------------------------------------------------
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1 — Sparse-clone product directory from external catalog repo
 # ---------------------------------------------------------------------------
+if [[ "$STEP1_CLONE_CATALOG_ARTIFACTS" == "false" ]]; then
+  echo "--- Step 1: SKIPPED (STEP1_CLONE_CATALOG_ARTIFACTS=false)"
+  # When skipping, PRODUCT_DIR must point to a local product checkout.
+  # Set PRODUCT_DIR in import.env or on the command line.
+  [[ -z "${PRODUCT_DIR:-}" ]] && { echo "ERROR: STEP1_CLONE_CATALOG_ARTIFACTS=false requires PRODUCT_DIR to be set"; exit 1; }
+  METADATA_FILE="${PRODUCT_DIR}/catalog/metadata.yaml"
+  [[ -f "$METADATA_FILE" ]] || { echo "ERROR: catalog/metadata.yaml not found in ${PRODUCT_DIR}"; exit 1; }
+  SOURCE_TYPE=$(yq '.sourceType' "$METADATA_FILE")
+  SOURCE_REPO=$(yq '.sourceRepo // ""' "$METADATA_FILE")
+  PRODUCT_ID=$(yq '.name' "$METADATA_FILE")
+  TARGET_TYPE=$(yq '.targetType // ""' "$METADATA_FILE")
+  [[ -z "$TARGET_TYPE" ]] && TARGET_TYPE="$SOURCE_TYPE"
+  echo "    sourceType=${SOURCE_TYPE}  targetType=${TARGET_TYPE}  productId=${PRODUCT_ID}"
+else
 echo "==> Step 1: Cloning product directory '${PRODUCT_NAME}' from external catalog"
-
-WORK_DIR=$(mktemp -d)
-trap 'rm -rf "$WORK_DIR"' EXIT
 
 CLONE_DIR="${WORK_DIR}/storefront"
 
@@ -116,7 +151,7 @@ fi
 METADATA_FILE="${PRODUCT_DIR}/${PRODUCT_VERSION}/metadata.yaml"
 [[ -f "$METADATA_FILE" ]] || { echo "ERROR: ${PRODUCT_VERSION}/metadata.yaml not found in ${PRODUCT_DIR}"; exit 1; }
 
-
+# Read metadata — lives in catalog/metadata.yaml
 SOURCE_TYPE=$(yq '.spec.catalog.sourceType' "$METADATA_FILE")
 SOURCE_REPO=$(yq '.spec.catalog.sourceRepo // ""' "$METADATA_FILE")
 PRODUCT_ID=$(yq '.spec.catalog.name' "$METADATA_FILE")
@@ -125,12 +160,21 @@ TARGET_TYPE=$(yq '.spec.catalog.targetType // ""' "$METADATA_FILE")
 [[ -z "$TARGET_TYPE" ]] && TARGET_TYPE="$SOURCE_TYPE"
 
 echo "    version=${PRODUCT_VERSION}  sourceType=${SOURCE_TYPE}  targetType=${TARGET_TYPE}  productId=${PRODUCT_ID}"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 2 — Acquire chart source into CHART_SRC (local directory)
 # ---------------------------------------------------------------------------
 
-if [[ "$SOURCE_TYPE" == "helm-registry" ]]; then
+if [[ "$STEP2_PULL_CHART" == "false" ]]; then
+  echo "--- Step 2: SKIPPED (STEP2_PULL_CHART=false)"
+  # CHART_SRC must point to an already-pulled chart directory containing Chart.yaml.
+  [[ -z "${CHART_SRC:-}" ]] && { echo "ERROR: STEP2_PULL_CHART=false requires CHART_SRC to be set"; exit 1; }
+  [[ -f "${CHART_SRC}/Chart.yaml" ]] || { echo "ERROR: Chart.yaml not found at CHART_SRC=${CHART_SRC}"; exit 1; }
+  CHART_VERSION=$(yq '.version' "${CHART_SRC}/Chart.yaml")
+  CHART_NAME=$(yq '.name' "${CHART_SRC}/Chart.yaml")
+  echo "    chart=${CHART_NAME}  version=${CHART_VERSION}"
+elif [[ "$SOURCE_TYPE" == "helm-registry" ]]; then
   echo "==> Step 2: Pulling helm chart from registry ${SOURCE_REPO}"
 
   CHART_DIR="${WORK_DIR}/chart"
@@ -144,7 +188,7 @@ if [[ "$SOURCE_TYPE" == "helm-registry" ]]; then
       --password "${PRODUCT_SOURCE_KEY##*:}" 2>/dev/null || true
   fi
 
-  helm pull "$SOURCE_REPO" --untar --untardir "$CHART_DIR" || \
+  helm pull "$SOURCE_REPO" --untar --untardir "$CHART_DIR" --insecure-skip-tls-verify || \
     { echo "ERROR: helm pull failed from ${SOURCE_REPO}"; exit 1; }
 
   # Find root application Chart.yaml, avoiding dependency library charts (e.g., charts/common)
@@ -199,7 +243,21 @@ echo "    chart=${CHART_NAME}  version=${CHART_VERSION}"
 # Step 3 — Deliver chart to target (helm-registry or helm-git)
 # ---------------------------------------------------------------------------
 
-if [[ "$TARGET_TYPE" == "helm-registry" ]]; then
+if [[ "$STEP3_PUSH_CHART" == "false" ]]; then
+  echo "--- Step 3: SKIPPED (STEP3_PUSH_CHART=false)"
+  # Derive the same values step 3 would have produced, so downstream steps work unchanged.
+  # Override SPEC_REGISTRY or SPEC_REPO_URL in import.env if the defaults are wrong.
+  if [[ "$TARGET_TYPE" == "helm-registry" ]]; then
+    SPEC_REGISTRY="${SPEC_REGISTRY:-oci://${QUAY_REGISTRY}/sovcloud/cp/sovereign-cloud-platform/byop/charts/${CHART_NAME}}"
+    SPEC_REPO_URL=""
+    echo "    SPEC_REGISTRY=${SPEC_REGISTRY}"
+  else
+    SPEC_REGISTRY=""
+    SPEC_REPO_URL="${SPEC_REPO_URL:-${TARGET_REPO}}"
+    [[ -z "$SPEC_REPO_URL" ]] && { echo "ERROR: STEP3_PUSH_CHART=false with helm-git requires SPEC_REPO_URL or TARGET_REPO to be set"; exit 1; }
+    echo "    SPEC_REPO_URL=${SPEC_REPO_URL}"
+  fi
+elif [[ "$TARGET_TYPE" == "helm-registry" ]]; then
   echo "==> Step 3: Pushing helm chart to Quay registry"
 
   helm registry login "$QUAY_REGISTRY" --username "$QUAY_USERNAME" --password "$QUAY_PASSWORD" \
@@ -247,10 +305,13 @@ fi
 # ---------------------------------------------------------------------------
 # Step 4 — Mirror images to Quay
 # ---------------------------------------------------------------------------
-echo "==> Step 4: Mirroring images to Quay"
-
-# Images are defined inline in <version>/metadata.yaml
+# Images are defined inline in <version>/metadata.yaml — needed by Steps 4 and 5
 IMAGE_COUNT=$(yq '.spec.catalog.images | length' "$METADATA_FILE")
+
+if [[ "$STEP4_MIRROR_IMAGES" == "false" ]]; then
+  echo "--- Step 4: SKIPPED (STEP4_MIRROR_IMAGES=false)"
+else
+echo "==> Step 4: Mirroring images to Quay"
 
 skopeo login "$QUAY_REGISTRY" --username "$QUAY_USERNAME" --password "$QUAY_PASSWORD" --tls-verify=false
 
@@ -279,10 +340,14 @@ for (( idx=0; idx<IMAGE_COUNT; idx++ )); do
     "docker://${SRC_IMAGE}" \
     "docker://${DEST_IMAGE}"
 done
+fi
 
 # ---------------------------------------------------------------------------
 # Step 5 — Create BYOPTemplate CR
 # ---------------------------------------------------------------------------
+if [[ "$STEP5_CREATE_BYOP_TEMPLATE" == "false" ]]; then
+  echo "--- Step 5: SKIPPED (STEP5_CREATE_BYOP_TEMPLATE=false)"
+else
 echo "==> Step 5: Creating BYOPTemplate CR"
 
 # Encode schema from catalog/schema.json
@@ -293,7 +358,7 @@ REGISTRATION_SCHEMA=$(base64 -i "$SCHEMA_FILE" | tr -d '\n')
 # Build imageMirrors block from metadata.yaml (destination field = canonical chart path)
 IMAGE_MIRRORS=""
 for (( idx=0; idx<IMAGE_COUNT; idx++ )); do
-  DEST_LINE=$(yq ".spec.catalog.images[${idx}].destination" "$METADATA_FILE")
+  DEST_LINE=$(yq ".images[${idx}].destination" "$METADATA_FILE")
   REGISTRY=$(echo "$DEST_LINE" | cut -d'/' -f1)
   REMAINDER=$(echo "$DEST_LINE" | cut -d'/' -f2-)
   REPO_NO_TAG=$(echo "$REMAINDER" | cut -d':' -f1)
@@ -343,7 +408,7 @@ ${SOURCE_FIELDS}
     displayName: ${DISPLAY_NAME}
     description: ${DESCRIPTION}
     category: ${CATEGORY}
-    tags: [$(yq '.tags | join(", ")' "$CATALOG_FILE")]
+    tags: [$(yq '(.tags // []) | join(", ")' "$CATALOG_FILE")]
     supportUrl: ${SUPPORT_URL}
     marketingUrl: ${MARKETING_URL}
   imageMirrors:${IMAGE_MIRRORS}
@@ -389,10 +454,17 @@ EOF
   oc apply -f "$ITMS_IDMS_FILE" || echo "WARNING: Failed to apply ITMS/IDMS directly (cluster-scoped admin permissions may be required)"
 fi
 
+fi  # end Step 5
+
 # ---------------------------------------------------------------------------
 # Step 6 — Ensure platform owner secret exists in byop-service-broker
 # ---------------------------------------------------------------------------
+if [[ "$STEP6_CREATE_PLATFORM_OWNER_SECRET" == "false" ]]; then
+  echo "--- Step 6: SKIPPED (STEP6_CREATE_PLATFORM_OWNER_SECRET=false)"
+else
 echo "==> Step 6: Ensuring platform owner secret 'byop-platform-owner-secret'"
+
+[[ -z "${SOVEREIGN_CORE_APIKEY:-}" ]] && { echo "ERROR: SOVEREIGN_CORE_APIKEY must be set in import.env for Step 6"; exit 1; }
 
 oc create secret generic byop-platform-owner-secret \
   --from-literal=apiKey="${SOVEREIGN_CORE_APIKEY}" \
@@ -400,9 +472,14 @@ oc create secret generic byop-platform-owner-secret \
   --dry-run=client -o yaml | oc apply -f -
 echo "    byop-platform-owner-secret applied to namespace '${BYOP_NAMESPACE}'"
 
+fi
+
 # ---------------------------------------------------------------------------
 # Step 7 — Register TARGET_REPO with ArgoCD in openshift-gitops
 # ---------------------------------------------------------------------------
+if [[ "$STEP7_REGISTER_TARGET_REPO" == "false" ]]; then
+  echo "--- Step 7: SKIPPED (STEP7_REGISTER_TARGET_REPO=false)"
+else
 echo "==> Step 7: Registering GitOps repo with ArgoCD"
 
 ARGOCD_SECRET_NAME="argocd-repo-byop-gitops"
@@ -428,10 +505,15 @@ ARGOEOF
 oc apply -f "$ARGOCD_SECRET_FILE"
 echo "    ArgoCD repo secret '${ARGOCD_SECRET_NAME}' applied to namespace '${ARGOCD_NAMESPACE}'"
 
+fi
+
 # ---------------------------------------------------------------------------
 # Step 8 — Ensure ACM placement resources exist in byop-service-broker
 # These are cluster-level prerequisites created once; oc apply is idempotent.
 # ---------------------------------------------------------------------------
+if [[ "$STEP8_CREATE_ACM_PLACEMENT_RESOURCES" == "false" ]]; then
+  echo "--- Step 8: SKIPPED (STEP8_CREATE_ACM_PLACEMENT_RESOURCES=false)"
+else
 echo "==> Step 8: Ensuring ACM ManagedClusterSetBinding / Placement / PlacementBinding"
 
 ACM_MANIFEST="${WORK_DIR}/acm-placement.yaml"
@@ -487,6 +569,8 @@ ACMEOF
 
 oc apply -f "$ACM_MANIFEST"
 echo "    ACM placement resources applied to namespace '${BYOP_NAMESPACE}'"
+
+fi
 
 echo ""
 echo "Done. BYOPTemplate '${CR_NAME}' applied to namespace '${BYOP_NAMESPACE}'."

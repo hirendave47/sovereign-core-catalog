@@ -1,0 +1,44 @@
+apiVersion: sovereign-catalog.io/v1alpha1
+kind: SoftwareListing
+metadata:
+  companyRef: "companies/ibm"
+  vendor: "International Business Machines Corporation"
+  product: "IBM Maximo Application Suite"
+  shortDescription: "IBM Maximo Application Suite (MAS) is an integrated enterprise asset management platform that unifies AI-driven operations, predictive maintenance, and IoT insights — delivered as a containerised, operator-managed suite on OpenShift."
+  fullDescription: "IBM Maximo Application Suite (MAS) v9.2 brings together the full portfolio of Maximo applications — including Maximo Manage, Monitor, Health, Predict, and Visual Inspection — as a single, cloud-native suite on OpenShift. MAS v9.2 is deployed via the IBM MAS operator catalog using an install-Job pattern driven by the IBM MAS CLI. Each tenant receives a fully isolated MAS instance with a dedicated namespace, service account, and workspace. The core platform (Suite only) provides the MAS base infrastructure, identity management, and workspace control plane. The Core + Manage plan additionally provisions Maximo Manage with Db2 Warehouse for production asset management workloads. MAS supports air-gapped installation using the IBM operator catalog mirrored to a private registry, making it suitable for disconnected sovereign and regulated environments. Key use cases include enterprise asset lifecycle management, predictive and prescriptive maintenance, regulatory compliance tracking, facilities and infrastructure management, and utilities and energy asset operations."
+  sovereignCoreRelevance: "MAS is designed for air-gapped OpenShift deployment using a mirrored IBM operator catalog, with no runtime dependency on external IBM endpoints. All images, operators, and dependencies are self-contained within the Sovereign Core environment, meeting data-residency and supply-chain transparency requirements for sovereign and regulated asset management workloads."
+  category: "automation"
+  industries: ["government", "energy", "healthcare"]
+  intendedUsers: ["Platform engineers", "Asset management teams", "Operations teams", "IT administrators"]
+  version: "9.2.0"
+  lifecycleStatus: "draft"
+  storefrontVisibility: "public"
+  availabilityState: "byop_ready"
+spec:
+  openSource:
+    enabled: false
+    license: "IBM International Program License Agreement"
+    sourceAvailable: false
+  jurisdiction:
+    hq: "USA"
+    ultimateParentCompanyHQ: "USA"
+  architecture:
+    format: "Kubernetes"
+    airgapReady: true
+    dependencyEndpoints: []
+    storage:
+      csiAccessModes: ["ReadWriteOnce", "ReadWriteMany"]
+      volumeSnapshotSupport: true
+    kubernetesCompatibility:
+      minOcpVersionTested: "4.14"
+  security:
+    podSecurityStandard: "baseline"
+    requiresClusterAdmin: true
+    readOnlyRootFilesystem: false
+    kmsIntegration: false
+  deployment:
+    type: "Operator"
+    repository: "oci://icr.io/cpopen/ibm-operator-catalog:v9-260918-amd64"
+  links:
+    docsUrl: "https://www.ibm.com/docs/en/mas-cd/continuous-delivery"
+    productPageUrl: "https://www.ibm.com/products/maximo"

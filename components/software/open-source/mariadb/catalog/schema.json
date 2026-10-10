@@ -4,79 +4,25 @@
   "title": "MariaDB Instance Parameters",
   "description": "Parameters for provisioning a MariaDB database instance",
   "properties": {
-    "cluster_url": {
-      "type": "string",
-      "description": "Target cluster server URL (optional, defaults to broker's cluster). Must be a registered ArgoCD cluster.",
-      "format": "uri",
-      "pattern": "^https://.*",
-      "examples": [
-        "https://kubernetes.default.svc",
-        "https://192.168.2.89:6443",
-        "https://192.168.2.90:6443"
-      ]
-    },
-    "database_name": {
-      "type": "string",
-      "description": "Name of the database to create",
-      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
-      "minLength": 1,
-      "maxLength": 64,
-      "examples": ["myapp", "production_db", "test_database"]
-    },
-    "database_user": {
-      "type": "string",
-      "description": "Database user name (auto-generated if not provided)",
-      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
-      "minLength": 1,
-      "maxLength": 32,
-      "default": "appuser",
-      "examples": ["appuser", "dbadmin", "service_account"]
-    },
-    "database_password": {
-      "type": "string",
-      "description": "Database user password (auto-generated if not provided)",
-      "minLength": 8,
-      "maxLength": 128,
-      "examples": ["SecureP@ssw0rd123"],
-      "x-generate": {
-        "type": "password",
-        "length": 24,
-        "include": "alphanumeric-symbols"
-      }
-    },
-    "root_password": {
-      "type": "string",
-      "description": "Root password (auto-generated if not provided)",
-      "minLength": 12,
-      "maxLength": 128,
-      "examples": ["VerySecureR00tP@ss"],
-      "x-generate": {
-        "type": "password",
-        "length": 32,
-        "include": "alphanumeric-symbols"
-      }
-    },
-    "character_set": {
-      "type": "string",
-      "description": "Default character set for the database",
-      "enum": ["utf8mb4", "utf8", "latin1", "ascii"],
-      "default": "utf8mb4",
-      "examples": ["utf8mb4"]
-    },
-    "collation": {
-      "type": "string",
-      "description": "Default collation for the database",
-      "enum": [
-        "utf8mb4_unicode_ci",
-        "utf8mb4_general_ci",
-        "utf8_unicode_ci",
-        "utf8_general_ci",
-        "latin1_swedish_ci"
-      ],
-      "default": "utf8mb4_unicode_ci",
-      "examples": ["utf8mb4_unicode_ci"]
-    }
+    "clusterTarget":                        {"type": "string",  "description": "Target cluster name — must match an existing cluster in Sovereign Core", "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$"},
+    "namespace":                            {"type": "string",  "description": "Kubernetes namespace to deploy into", "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$", "minLength": 1, "maxLength": 64, "default": "mariadb"},
+    "architecture":                         {"type": "string",  "description": "Deployment architecture: 'standalone' (single primary) or 'replication' (primary + secondaries)", "default": "standalone", "enum": ["standalone", "replication"]},
+    "auth.database":                        {"type": "string",  "description": "Name of the database to create on first run", "default": "my_database"},
+    "auth.username":                        {"type": "string",  "description": "Name of the application user to create alongside the database", "default": ""},
+    "auth.existingSecret":                  {"type": "string",  "description": "Name of a pre-existing Secret containing MariaDB credentials. Required keys: 'mariadb-root-password', 'mariadb-password', 'mariadb-replication-password' (replication only). When set, auth.rootPassword and auth.password are ignored.", "default": ""},
+    "primary.replicaCount":                 {"type": "integer", "description": "Number of primary pods", "default": 1, "minimum": 1},
+    "primary.resourcesPreset":              {"type": "string",  "description": "Resource preset for primary pods (nano, micro, small, medium, large, xlarge, 2xlarge)", "default": "small"},
+    "primary.persistence.enabled":          {"type": "boolean", "description": "Enable persistent storage for the primary", "default": true},
+    "primary.persistence.size":             {"type": "string",  "description": "PVC size for the primary (Kubernetes quantity, e.g. 8Gi)", "default": "8Gi"},
+    "primary.persistence.storageClass":     {"type": "string",  "description": "StorageClass for the primary PVC; leave empty to use the cluster default", "default": ""},
+    "secondary.replicaCount":               {"type": "integer", "description": "Number of secondary (read replica) pods; only used when architecture=replication", "default": 0, "minimum": 0},
+    "secondary.resourcesPreset":            {"type": "string",  "description": "Resource preset for secondary pods (nano, micro, small, medium, large, xlarge, 2xlarge)", "default": "small"},
+    "secondary.persistence.enabled":        {"type": "boolean", "description": "Enable persistent storage for secondaries", "default": true},
+    "secondary.persistence.size":           {"type": "string",  "description": "PVC size for secondary pods (Kubernetes quantity, e.g. 8Gi)", "default": "8Gi"},
+    "secondary.persistence.storageClass":   {"type": "string",  "description": "StorageClass for secondary PVCs; leave empty to use the cluster default", "default": ""},
+    "metrics.enabled":                      {"type": "boolean", "description": "Enable Prometheus metrics exporter sidecar (mysqld-exporter)", "default": false},
+    "global.imageRegistry":                 {"type": "string",  "description": "Override the image registry for all images; set to the internal Quay hostname when air-gapped", "default": ""},
+    "global.defaultStorageClass":           {"type": "string",  "description": "Default StorageClass applied to all PVCs; overrides cluster default", "default": ""}
   },
-  "required": ["database_name"],
-  "additionalProperties": false
+  "required": ["clusterTarget", "namespace", "auth.existingSecret"]
 }

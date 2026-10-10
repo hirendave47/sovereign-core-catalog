@@ -1359,8 +1359,8 @@ if check_ha_cluster_active; then
     fi
 fi
 
-if [ -f "$HA_INITIATED_MARKER" ] || [ -f "/opt/qradar/ha/ha.conf" ]; then
-    echo "[INFO] HA pairing was previously initiated ($HA_INITIATED_MARKER or ha.conf found)." >> "$HA_LOG"
+if [ -f "/opt/qradar/ha/ha.conf" ] || ([ -f "$HA_INITIATED_MARKER" ] && /opt/qradar/ha/bin/ha stateshow 2>/dev/null | grep -qiE "active|standby|synchronizing|primary"); then
+    echo "[INFO] HA pairing was previously initiated (ha.conf or active stateshow found)." >> "$HA_LOG"
     echo "[INFO] Post-reboot continuation detected. Skipping pre-pairing steps and waiting for cluster convergence..." >> "$HA_LOG"
     if await_ha_cluster_stabilization; then
         install_preload_apps
@@ -1475,9 +1475,9 @@ for eula_retry in 1 2 3; do
     fi
 done
 
-for ((p=1; p<=20; p++)); do
+for ((p=1; p<=40; p++)); do
     ST_OUT=$(curl -sk -u "${ADMIN_USER}:${ADMIN_PASS}" -H "Version: 10.1" -H "Accept: application/json" "$DEPLOY_URL" 2>/dev/null || true)
-    echo "FULL deploy poll $p/20: $ST_OUT" >> "$HA_LOG"
+    echo "FULL deploy poll $p/40: $ST_OUT" >> "$HA_LOG"
     if echo "$ST_OUT" | grep -q '"status":"COMPLETE"'; then
         echo "[OK] FULL deploy status: COMPLETE" >> "$HA_LOG"
         break
@@ -1495,15 +1495,27 @@ INC_RESP=$(curl -sk -u "${ADMIN_USER}:${ADMIN_PASS}" \
     "$DEPLOY_URL" 2>&1 || true)
 echo "INCREMENTAL deploy trigger response: $INC_RESP" >> "$HA_LOG"
 
-for ((p=1; p<=20; p++)); do
+for ((p=1; p<=40; p++)); do
     ST_OUT=$(curl -sk -u "${ADMIN_USER}:${ADMIN_PASS}" -H "Version: 10.1" -H "Accept: application/json" "$DEPLOY_URL" 2>/dev/null || true)
-    echo "INCREMENTAL deploy poll $p/20: $ST_OUT" >> "$HA_LOG"
+    echo "INCREMENTAL deploy poll $p/40: $ST_OUT" >> "$HA_LOG"
     if echo "$ST_OUT" | grep -q '"status":"COMPLETE"'; then
         echo "[OK] INCREMENTAL deploy status: COMPLETE" >> "$HA_LOG"
         break
     fi
     sleep 15
 done
+
+# Wait for any in-flight deployment or staged config lock to clear before running do_deploy.pl
+echo "Waiting for any in-flight deployments to settle before do_deploy.pl..." >> "$HA_LOG"
+for ((w=1; w<=30; w++)); do
+    CUR_STATUS=$(curl -sk -u "${ADMIN_USER}:${ADMIN_PASS}" -H "Version: 10.1" -H "Accept: application/json" "$DEPLOY_URL" 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+    if [ -z "$CUR_STATUS" ] || [ "$CUR_STATUS" = "COMPLETE" ] || [ "$CUR_STATUS" = "SUCCESS" ]; then
+        break
+    fi
+    echo "Deployment in progress (status='$CUR_STATUS'), waiting 10s (attempt $w/30)..." >> "$HA_LOG"
+    sleep 10
+done
+sleep 15
 
 DO_DEPLOY="/opt/qradar/upgrade/util/setup/upgrades/do_deploy.pl"
 [ ! -f "$DO_DEPLOY" ] && DO_DEPLOY="/opt/qradar/bin/do_deploy.pl"
@@ -1518,6 +1530,9 @@ if [ -f "$DO_DEPLOY" ]; then
         sleep 20
     done
 fi
+
+# Purge any deployment requirement markers generated if do_deploy.pl hit a transient status lock
+rm -f /opt/qradar/conf/*DeployRequired.txt /tmp/restoringBackupSync.txt /tmp/addhost.txt 2>/dev/null || true
 
 echo "Polling hostcontext readiness..." >> "$HA_LOG"
 for ((attempt=1; attempt<=60; attempt++)); do
@@ -1571,6 +1586,12 @@ sshpass -p "$SECONDARY_PASS" ssh -o StrictHostKeyChecking=no "$SECONDARY_IP" "sy
 echo "Cleaning any stale HA failure tokens..." >> "$HA_LOG"
 rm -f /opt/qradar/ha/.local_ha_failed /opt/qradar/ha/.remote_ha_install /opt/qradar/ha/.finalize_remote_install 2>/dev/null || true
 sshpass -p "$SECONDARY_PASS" ssh -o StrictHostKeyChecking=no "$SECONDARY_IP" "rm -f /opt/qradar/ha/.local_ha_failed /opt/qradar/ha/.remote_ha_install /opt/qradar/ha/.finalize_remote_install 2>/dev/null || true" >> "$HA_LOG" 2>&1 || true
+
+# IBM Defect 169575: Purge stale deployment requirement markers
+# If upgradeDeployRequired.txt exists on disk, ha_setup.sh fails precheck with rc=136 (undeployed_changes_error)
+echo "Purging stale deployment requirement markers (IBM Defect 169575)..." >> "$HA_LOG"
+rm -f /opt/qradar/conf/*DeployRequired.txt /tmp/restoringBackupSync.txt /tmp/addhost.txt 2>/dev/null || true
+sshpass -p "$SECONDARY_PASS" ssh -o StrictHostKeyChecking=no "$SECONDARY_IP" "rm -f /opt/qradar/conf/*DeployRequired.txt /tmp/restoringBackupSync.txt /tmp/addhost.txt 2>/dev/null || true" >> "$HA_LOG" 2>&1 || true
 
 # Sanitize iptables dropins to prevent reload failures during ha_setup.sh
 echo "Sanitizing iptables dropins..." >> "$HA_LOG"
@@ -1653,7 +1674,8 @@ PAIRING_SUCCESS=false
 MAX_PAIR_ATTEMPTS=15
 PAIR_RETRY_SLEEP=60
 
-touch "$HA_INITIATED_MARKER"
+# Ensure clean marker state before pairing attempts
+rm -f "$HA_INITIATED_MARKER" 2>/dev/null || true
 
 for ((attempt=1; attempt<=MAX_PAIR_ATTEMPTS; attempt++)); do
     echo "Attempt $attempt/$MAX_PAIR_ATTEMPTS: Running add_ha_host.sh..." >> "$HA_LOG"
@@ -1662,6 +1684,7 @@ for ((attempt=1; attempt<=MAX_PAIR_ATTEMPTS; attempt++)); do
     if [[ "$CURRENT_STATE" == active* ]]; then
         echo "[OK] HA stateshow is already active ($CURRENT_STATE)." >> "$HA_LOG"
         PAIRING_SUCCESS=true
+        touch "$HA_INITIATED_MARKER"
         break
     fi
 
@@ -1677,6 +1700,7 @@ for ((attempt=1; attempt<=MAX_PAIR_ATTEMPTS; attempt++)); do
     if [ $PAIR_RC -eq 0 ]; then
         echo "[OK] add_ha_host.sh executed successfully." >> "$HA_LOG"
         PAIRING_SUCCESS=true
+        touch "$HA_INITIATED_MARKER"
         break
     else
         # In case add_ha_host returned non-zero but HA was initiated
@@ -1684,14 +1708,42 @@ for ((attempt=1; attempt<=MAX_PAIR_ATTEMPTS; attempt++)); do
         if [[ "$CURRENT_STATE" == active* ]] || [[ "$CURRENT_STATE" == synchronizing* ]]; then
             echo "[OK] add_ha_host.sh non-zero ($PAIR_RC) but HA state is '$CURRENT_STATE' — treating as initiated." >> "$HA_LOG"
             PAIRING_SUCCESS=true
+            touch "$HA_INITIATED_MARKER"
             break
         fi
         echo "[WARN] Pairing attempt $attempt/$MAX_PAIR_ATTEMPTS failed (rc=$PAIR_RC). Retrying in ${PAIR_RETRY_SLEEP}s..." >> "$HA_LOG"
+
+        # Inter-retry healing: clean any stale failure tokens, markers, and database rows created by failed pre-checks
+        rm -f /opt/qradar/ha/.local_ha_failed /opt/qradar/ha/.remote_ha_install /opt/qradar/ha/.finalize_remote_install 2>/dev/null || true
+        rm -f /opt/qradar/conf/*DeployRequired.txt /tmp/restoringBackupSync.txt /tmp/addhost.txt 2>/dev/null || true
+        sshpass -p "$SECONDARY_PASS" ssh -o StrictHostKeyChecking=no "$SECONDARY_IP" "rm -f /opt/qradar/ha/.local_ha_failed /opt/qradar/ha/.remote_ha_install /opt/qradar/ha/.finalize_remote_install /opt/qradar/conf/*DeployRequired.txt /tmp/restoringBackupSync.txt /tmp/addhost.txt 2>/dev/null || true" >> "$HA_LOG" 2>&1 || true
+
+        # Re-ensure mutual SSH trust (QRadar BaseHostExecutor removes secondary authorized_keys on pre-check failure)
+        cat /root/.ssh/id_rsa.pub | sshpass -p "$SECONDARY_PASS" ssh -o StrictHostKeyChecking=no "$SECONDARY_IP" "mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && sort -u -o /root/.ssh/authorized_keys /root/.ssh/authorized_keys" >> "$HA_LOG" 2>&1 || true
+        sshpass -p "$SECONDARY_PASS" ssh -o StrictHostKeyChecking=no "$SECONDARY_IP" "cat /root/.ssh/id_rsa.pub" >> /root/.ssh/authorized_keys 2>>"$HA_LOG" || true
+        chmod 600 /root/.ssh/authorized_keys
+        sort -u -o /root/.ssh/authorized_keys /root/.ssh/authorized_keys
+
+        # Clean any soft-deleted secondary host records from PostgreSQL
+        psql -U qradar -c "
+            BEGIN;
+            DELETE FROM license_pool_allocation WHERE host_id IN (
+                SELECT id FROM serverhost WHERE (managed_host_id IN (SELECT id FROM managedhost WHERE isconsole = true) AND ip != '$PRIMARY_IP') OR hostname LIKE 'Deleted-%' OR ip LIKE 'Deleted-%'
+            );
+            DELETE FROM license_key WHERE host_id IN (
+                SELECT id FROM serverhost WHERE (managed_host_id IN (SELECT id FROM managedhost WHERE isconsole = true) AND ip != '$PRIMARY_IP') OR hostname LIKE 'Deleted-%' OR ip LIKE 'Deleted-%'
+            );
+            DELETE FROM serverhost WHERE (managed_host_id IN (SELECT id FROM managedhost WHERE isconsole = true) AND ip != '$PRIMARY_IP') OR hostname LIKE 'Deleted-%' OR ip LIKE 'Deleted-%';
+            UPDATE managedhost SET secondary_host = NULL WHERE isconsole = true;
+            COMMIT;
+        " >> "$HA_LOG" 2>&1 || true
+
         sleep "$PAIR_RETRY_SLEEP"
     fi
 done
 
 if [ "$PAIRING_SUCCESS" != "true" ]; then
+    rm -f "$HA_INITIATED_MARKER" 2>/dev/null || true
     echo "[ERROR] Failed to initiate HA pairing after $MAX_PAIR_ATTEMPTS attempts." >> "$HA_LOG"
     exit 1
 fi

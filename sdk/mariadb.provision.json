@@ -1,0 +1,25 @@
+{
+  "service_id": "mariadb",
+  "plan_id": "standard",
+  "context": {
+    "platform": "kubernetes",
+    "account_id": "test-tenant"
+  },
+  "parameters": {
+    "spec": {
+      "productId": "mariadb",
+      "tenantId": "test-tenant",
+      "clusterTarget": "in-cluster",
+      "replicaCount": 1,
+      "databaseName": "appdb",
+      "databaseUser": "appuser",
+      "databasePassword": "change-me-password",
+      "rootPassword": "change-me-root-password",
+      "primary": {
+        "persistence": {
+          "enabled": false
+        }
+      }
+    }
+  }
+}

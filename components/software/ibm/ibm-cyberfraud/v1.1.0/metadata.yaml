@@ -1,0 +1,42 @@
+apiVersion: sovereign-catalog.io/v1alpha1
+kind: SoftwareListing
+metadata:
+  companyRef: "companies/ibm"
+  vendor: "International Business Machines Corporation"
+  product: "IBM Cyber Fraud"
+  shortDescription: "Fraud evolves faster than manual investigations can keep up. IBM Cyber Fraud unifies multiple data sources into one investigation experience, with AI agents executing repeatable natural language playbooks while investigators retain full oversight."
+  fullDescription: "Fraud evolves faster than manual investigations can keep up. Investigators gather evidence across disconnected systems, while case backlogs grow and investigation outcomes vary. IBM Cyber Fraud unifies multiple data sources into one investigation experience. AI agents execute repeatable natural language playbooks while investigators retain full oversight and can interactively refine the investigation. Connect existing data sources and connect to an inference engine within IBM Sovereign Core to fit the customer's environment."
+  sovereignCoreRelevance: "Extends sovereign operations with AI-driven fraud investigation, cross-system data correlation, and repeatable investigative workflows — supporting data residency requirements, air-gap deployments, and continuous compliance for regulated financial institutions."
+  category: "security"
+  industries: ["bfsi", "government", "healthcare", "telco"]
+  intendedUsers: ["Fraud Investigator", "Fraud Operations Manager", "Financial Crime Analyst", "CISO", "Security Analyst", "Compliance Officer", "Risk Manager"]
+  version: "1.1.0"
+  lifecycleStatus: "approved"
+  storefrontVisibility: "public"
+  availabilityState: "available_central_it"
+spec:
+  openSource:
+    enabled: false
+    license: "IBM International Program License Agreement"
+    sourceAvailable: false
+  jurisdiction:
+    hq: "USA"
+    ultimateParentCompanyHQ: "USA"
+  architecture:
+    format: "Operator"
+    airgapReady: true
+    dependencyEndpoints: []
+    storage:
+      csiAccessModes: ["ReadWriteOnce"]
+      volumeSnapshotSupport: false
+  security:
+    podSecurityStandard: "restricted"
+    requiresClusterAdmin: false
+    readOnlyRootFilesystem: true
+    kmsIntegration: false
+  deployment:
+    type: "OLM"
+    repository: "https://github.com/IBM/cloud-pak/tree/master/repo/case/ibm-cyberfraud"
+  links:
+    docsUrl: "https://www.ibm.com/docs/en/cyber-fraud/1.x"
+    productPageUrl: "https://www.ibm.com/products/cyber-fraud"

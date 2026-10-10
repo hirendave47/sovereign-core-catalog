@@ -72,11 +72,73 @@ network:
 # Storage
 # ---------------------------------------------------------------------------
 storage:
-  storageClassName: ocs-storagecluster-ceph-rbd
-  isoStorageGb: 30
-  mediaNamespace: qradar-media
-  goldenImagePvc: rhel8-qradar-golden
-  isoPvc: qradar-installation-cdrom
+  # StorageClass for VM root-disk PVCs created by CDI.
+  # Run `oc get sc` to list available storage classes on your cluster.
+  # Set to the name of a RWO-capable block storage class.
+  #
+  #   Option A — OpenShift Data Foundation (ODF/OCS) — most IBM-deployed clusters
+  #     storageClassName: ocs-storagecluster-ceph-rbd
+  #
+  #   Option B — Platform Ceph RBD — used on some clusters (e.g. Fyre/demo environments)
+  #     storageClassName: ceph-rbd-platform
+  #
+  #   Option C — Standard/default storage class (single-node, dev, or custom clusters)
+  #     storageClassName: ""   # leave empty to use the cluster default StorageClass
+  #
+  storageClassName: ""   # empty = use the cluster default StorageClass
+  # dockerconfigjson secret — used by virt-launcher to pull containerDisk images.
+  # Created by this chart when quayPullSecretB64 is set, or pre-created out-of-band.
+  imagePullSecret: quay-pull-secret
+  # Opaque secret (accessKeyId / secretKey) — used by CDI importer to pull DataVolume
+  # registry source images. CDI does not understand dockerconfigjson format.
+  # Created by this chart when quayUsername and quayPassword are set.
+  cdiPullSecret: quay-cdi-secret
+  goldenDisk:
+    image: "registry-quay-quay-enterprise.apps.devit88.sc.fyreservices.com/quayadmin/rhel8-qradar-golden:8.10"
+    size: "250Gi"
+  installationIso:
+    image: "registry-quay-quay-enterprise.apps.devit88.sc.fyreservices.com/quayadmin/qradar-installation-cdrom:latest"
+
+# ---------------------------------------------------------------------------
+# Tool image for the secret-copy sync hook Job
+# ---------------------------------------------------------------------------
+# This Job needs a container with `oc` (or `kubectl`) + `python3` to copy
+# the Quay pull secrets from the qradar-media namespace into the instance
+# namespace at deploy time.
+#
+# Choose the option that matches your cluster environment:
+#
+#   Option A — Red Hat connected cluster (requires registry.redhat.io pull secret)
+#   ❌ Will fail if the cluster has no Red Hat subscription or global pull secret.
+#     repository: registry.redhat.io/openshift4/ose-cli
+#     tag: latest
+#
+#   Option B — Internal OpenShift image registry (air-gapped, no external access needed)
+#   ❌ Will fail if the cluster's internal registry is not deployed (ManagementState: Removed).
+#   ✅ Works on most standard OpenShift installs — the 'cli' ImageStream ships in every cluster.
+#     repository: image-registry.openshift-image-registry.svc:5000/openshift/cli
+#     tag: latest
+#
+#   Option C — Public quay.io (no authentication required) ✅ RECOMMENDED for new clusters
+#   ✅ Works on any cluster with outbound internet access to quay.io.
+#   ✅ No pull secret required.  Includes both `oc` and `python3`.
+#     repository: quay.io/openshift/origin-cli
+#     tag: latest
+#
+#   Option D — Mirrored / private registry
+#   Use when quay.io is not reachable (fully air-gapped) and you have a local mirror.
+#   Set pullSecret to the name of a pre-existing kubernetes.io/dockerconfigjson Secret
+#   in the release namespace — credentials are NEVER placed directly in values.yaml.
+#     repository: my-mirror.example.com/openshift4/ose-cli
+#     tag: latest
+#     pullSecret: my-mirror-pull-secret
+#
+# pullSecret is OPTIONAL — omit (or leave "") for Options A, B, and C.
+toolImage:
+  repository: quay.io/openshift/origin-cli
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecret: ""   # optional: name of an existing imagePullSecret in the release namespace
 
 # ---------------------------------------------------------------------------
 # Readiness probe
