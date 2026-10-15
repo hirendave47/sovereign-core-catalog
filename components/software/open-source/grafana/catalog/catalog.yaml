@@ -1,0 +1,21 @@
+name: Grafana OIDC IBM Verify
+metadata:
+  name: grafanaiamoidc-helm-git
+  namespace: byop-broker
+spec:
+  productId: grafanaiamoidc
+  sourceType: helm-git
+  repoURL: git@github.ibm.com:sovcore/sovcore-placeholder.git
+  version: "1.0.0"
+  catalogRegistration:
+    displayName: Grafana OIDC IBM Verify
+    description: Grafana observability platform with IBM Verify OAuth2 (PKCE) authentication and IAM proxy sidecar
+    plans:
+      - id: standard
+        name: Standard
+        description: Standard Grafana deployment with IBM Verify OAuth2 authentication, IAM proxy sidecar, and persistent storage
+    category: monitoring
+    tags: [Monitoring, Observability, Grafana, OAuth, OIDC]
+    supportUrl: https://www.ibm.com
+    marketingUrl: https://www.ibm.com/products
+    provisioningDurationMinutes: 5

@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Grafana OIDC IBM Verify Instance Parameters",
+  "description": "Parameters for provisioning a Grafana OIDC IBM Verify instance",
+  "properties": {
+    "clusterTarget": {
+      "type": "string",
+      "description": "Target cluster name",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Kubernetes namespace",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$",
+      "default": "grafana"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "description": "Replicas",
+      "default": 1,
+      "minimum": 1
+    },
+    "admin.user": {
+      "type": "string",
+      "description": "Admin username",
+      "default": "admin"
+    },
+    "admin.password": {
+      "type": "string",
+      "description": "Admin password",
+      "default": ""
+    },
+    "route.enabled": {
+      "type": "boolean",
+      "description": "Enable OpenShift Route",
+      "default": true
+    },
+    "route.host": {
+      "type": "string",
+      "description": "Route hostname",
+      "default": ""
+    },
+    "route.tls.termination": {
+      "type": "string",
+      "description": "Route TLS termination",
+      "default": "edge"
+    },
+    "persistence.enabled": {
+      "type": "boolean",
+      "description": "Enable storage",
+      "default": true
+    },
+    "persistence.size": {
+      "type": "string",
+      "description": "Storage size",
+      "default": "10Gi"
+    },
+    "persistence.storageClass": {
+      "type": "string",
+      "description": "Storage class",
+      "default": ""
+    },
+    "iamProxy.iamBaseUrl": {
+      "type": "string",
+      "description": "IAM base URL",
+      "default": ""
+    },
+    "config.server.rootUrl": {
+      "type": "string",
+      "description": "Grafana root URL",
+      "default": ""
+    },
+    "config.auth.genericOAuth.authUrl": {
+      "type": "string",
+      "description": "OAuth auth URL",
+      "default": ""
+    },
+    "config.auth.genericOAuth.tokenUrl": {
+      "type": "string",
+      "description": "OAuth token URL",
+      "default": ""
+    },
+    "config.auth.genericOAuth.redirectUri": {
+      "type": "string",
+      "description": "OAuth redirect URI",
+      "default": ""
+    },
+    "config.auth.genericOAuth.clientId": {
+      "type": "string",
+      "description": "OAuth client ID",
+      "default": ""
+    },
+    "config.auth.genericOAuth.clientSecret": {
+      "type": "string",
+      "description": "OAuth client secret",
+      "default": ""
+    }
+  },
+  "required": [
+    "clusterTarget",
+    "namespace",
+    "admin.password",
+    "route.host",
+    "iamProxy.iamBaseUrl",
+    "config.server.rootUrl",
+    "config.auth.genericOAuth.authUrl",
+    "config.auth.genericOAuth.tokenUrl",
+    "config.auth.genericOAuth.redirectUri",
+    "config.auth.genericOAuth.clientId",
+    "config.auth.genericOAuth.clientSecret"
+  ]
+}

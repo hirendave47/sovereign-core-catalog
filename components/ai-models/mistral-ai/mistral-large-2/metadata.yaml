@@ -3,10 +3,30 @@ kind: ModelListing
 metadata:
   companyRef: "companies/mistral-ai"
   vendor: "Mistral AI"
-  product: "Mistral Large 2"
-  shortDescription: "Enterprise-grade open-weight and proprietary large language models designed for secure, in-boundary AI deployments. Mistral enables organizations to build and scale trusted AI solutions while maintaining sovereignty, governance, and operational control."
-  fullDescription: "Enterprise-grade open-weight and proprietary large language models designed for secure, in-boundary AI deployments. Mistral enables organizations to build and scale trusted AI solutions while maintaining sovereignty, governance, and operational control."
-  sovereignCoreRelevance: "Mistral AI and IBM Sovereign Core help organizations accelerate sovereign AI adoption by combining advanced AI capabilities with sovereign-by-design operations. Together, they enable AI workloads to run within controlled environments while preserving data residency, compliance requirements, infrastructure independence, and operational governance."
+  product: "Mistral family"
+  shortDescription: "Mistral AI's large language models, available on IBM Sovereign Core through IBM watsonx.ai. They support enterprise reasoning, agentic AI, and multilingual workloads that can run in the customer's own environment."
+  fullDescription: |-
+    IBM Sovereign Core clients can access Mistral AI models through the existing IBM and Mistral AI watsonx.ai offerings. The available model families are Mistral Large, Mistral Medium, Mistral Small, Codestral, Devstral, Magistral, Ministral, and Voxtral. Together they support retrieval-augmented generation (RAG), question answering, function calling, multilingual applications, vision, and coding.
+
+    The Mistral Large models offer enterprise-grade reasoning and agentic AI capabilities. Mistral AI models are designed to perform well while using infrastructure efficiently, which can help organizations move AI beyond experimentation.
+
+    Core capabilities:
+    - Agentic AI that supports autonomous workflows and assistants.
+    - Multilingual intelligence with support across global languages.
+    - Efficient AI that is designed to optimize compute use.
+    - Platform flexibility beyond hyperscaler-only services.
+
+    What makes this offering different:
+    - Available through IBM watsonx.ai on IBM Sovereign Core.
+    - Can be deployed on premises.
+    - Designed to support air-gapped environments.
+    - Integrated with watsonx.ai.
+    - Mistral AI's open-weight models are also available.
+
+    Typical workflows include citizen services assistants for public sector agencies, financial research and analysis for banks and insurers, and enterprise knowledge agents that help employees find information, automate work, and make decisions faster.
+
+    IBM part numbers: D0QN4ZX (Resource Unit Monthly License), D0QN5ZX (Resource Unit Subscription License), D0QN8ZX (Non-Production Resource Unit Monthly License), and D0QN9ZX (Non-Production Resource Unit Subscription License).
+  sovereignCoreRelevance: "Mistral AI models on IBM Sovereign Core give organizations an option to run AI in their chosen environment, including on premises and in air-gapped deployments. Because AI can run where the data already lives, the models can suit organizations with sensitive or regulated data. Mistral AI is headquartered in France, which may interest organizations that want a regional AI strategy."
   category: "text_generation"
   industries:
     ["government", "bfsi", "healthcare", "energy", "telco", "sovereign_ai"]
@@ -20,7 +40,7 @@ metadata:
       "AI administrators",
       "Enterprise architects",
     ]
-  version: "2"
+  version: "Multiple (see description)"
   availabilityState: "technical_assets_available"
   lifecycleStatus: "approved"
   storefrontVisibility: "public"
@@ -30,7 +50,7 @@ spec:
     license: "Proprietary"
   jurisdiction:
     hq: "France"
-    ultimateParentCompanyHQ: "EU/France"
+    ultimateParentCompanyHQ: "France"
   architecture:
     format: "Safetensors"
     airgapReady: true
@@ -39,4 +59,4 @@ spec:
     servingEngine: "vLLM"
   links:
     productPageUrl: "https://mistral.ai/"
-    docsUrl: "https://www.ibm.com/new/announcements/mistral-ais-next-generation-flagship-llm-mistral-large-2-is-now-available-in-ibm-watsonx"
+    docsUrl: "https://www.ibm.com/new/announcements/ibm-launches-mistral-ai"

@@ -1,0 +1,58 @@
+apiVersion: sovereign-catalog.io/v1alpha1
+kind: SoftwareListing
+metadata:
+  companyRef: "companies/open-source"
+  vendor: "Grafana Labs"
+  product: "Grafana OIDC IBM Verify"
+  shortDescription: "Open-source observability and dashboarding platform secured with IBM Verify OAuth2 (PKCE) single sign-on and an IAM userinfo proxy sidecar."
+  fullDescription: "Grafana is the leading open-source platform for querying, visualizing, alerting on, and exploring metrics, logs, and traces wherever they are stored. This offering packages Grafana with IBM Verify as the OpenID Connect identity provider, using the OAuth2 Authorization Code flow with PKCE so users sign in through their existing enterprise identity rather than local Grafana accounts. An IAM proxy sidecar runs alongside Grafana to serve normalized userinfo claims, enabling consistent mapping of IBM Verify identities and groups to Grafana users, teams, and roles. Dashboards, data source configuration, and user state are kept on persistent storage so they survive pod restarts and upgrades. The deployment is delivered as a Helm chart, making it straightforward to install, upgrade, and manage through GitOps workflows on Kubernetes and OpenShift clusters."
+  sovereignCoreRelevance: "Provides self-hosted observability dashboards with centralized enterprise identity via IBM Verify, keeping monitoring data inside the sovereign environment while enforcing federated authentication and role mapping."
+  category: "observability"
+  industries: ["government", "bfsi", "healthcare", "energy", "telco"]
+  intendedUsers:
+    [
+      "Platform engineers",
+      "Site reliability engineers",
+      "Application developers",
+    ]
+  version: "1.0.4"
+  lifecycleStatus: "approved"
+  storefrontVisibility: "public"
+  availabilityState: "available_central_it"
+spec:
+  openSource:
+    enabled: true
+    license: "AGPL-3.0"
+    upstreamProject: "https://github.com/grafana/grafana"
+    upstreamVersion: "12.1.1"
+  architecture:
+    format: "Kubernetes"
+    airgapReady: false
+    dependencyEndpoints: ["*.verify.ibm.com"]
+    storage:
+      csiAccessModes: ["ReadWriteOnce"]
+      volumeSnapshotSupport: true
+  security:
+    podSecurityStandard: "baseline"
+    requiresClusterAdmin: false
+    readOnlyRootFilesystem: false
+    kmsIntegration: false
+  deployment:
+    type: "Helm"
+    repository: "oci://ghcr.io/ruchirmumbarkar2/grafana-helm-oidc"
+  links:
+    docsUrl: "https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/"
+    productPageUrl: "https://grafana.com/oss/grafana/"
+  catalog:
+    brokerType: "platform"
+    sourceType: "helm-registry"
+    name: "grafanaiamoidc"
+    sourceRepo: "oci://ghcr.io/ruchirmumbarkar2/grafana-helm-oidc:1.0.4"
+    # The import script rewrites these to Quay mirror destinations.
+    # grafana   — main dashboard workload
+    # iam-proxy — IAM userinfo proxy sidecar
+    images:
+      - source: "docker.io/grafana/grafana:12.1.1"
+        destination: "docker.io/grafana/grafana:12.1.1"
+      - source: "ghcr.io/ruchirmumbarkar2/iam-proxy:latest"
+        destination: "ghcr.io/ruchirmumbarkar2/iam-proxy:latest"

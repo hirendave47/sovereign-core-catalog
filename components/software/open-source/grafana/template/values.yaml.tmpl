@@ -1,0 +1,65 @@
+# Helm values override for Grafana OIDC IBM Verify instance
+namespaceOverride: {{ namespace }}
+
+commonLabels:
+  app: grafana
+  service-type: grafanaiamoidc
+
+commonAnnotations:
+  sovcore.byop.ibm.com/crn: {{ context.crn | default("crn:unknown") | yaml_safe }}
+  sovcore.byop.ibm.com/account-id: {{ context.account_id | default("unknown") | yaml_safe }}
+  sovcore.byop.ibm.com/sub-account-id: {{ context.sub_account_id | default("unknown") | yaml_safe }}
+  sovcore.byop.ibm.com/platform: {{ context.platform | default("unknown") | yaml_safe }}
+
+instance:
+  name: {{ instance_name }}
+  id: "{{ instance_id }}"
+  environment: {{ environment }}
+  clusterName: "{{ cluster_name }}"
+
+image:
+  registry: BYOP_REGISTRY
+  repository: byop/grafana
+  tag: "12.1.1"
+
+imagePullSecrets:
+{% if image_pull_secret_name %}
+  - name: {{ image_pull_secret_name }}
+{% else %}
+  []
+{% endif %}
+
+replicaCount: {{ replicas }}
+
+admin:
+  user: {{ spec.admin_user | default("admin") | yaml_safe }}
+  password: {{ spec.admin_password | yaml_safe }}
+
+route:
+  enabled: {{ spec.route_enabled | default(true) }}
+  host: {{ spec.route_host | yaml_safe }}
+  tls:
+    termination: {{ spec.route_tls_termination | default("edge") | yaml_safe }}
+
+iamProxy:
+  image:
+    registry: BYOP_REGISTRY
+    repository: byop/iam-proxy
+    tag: "latest"
+  iamBaseUrl: {{ spec.iam_base_url | yaml_safe }}
+
+config:
+  server:
+    rootUrl: {{ spec.root_url | yaml_safe }}
+  auth:
+    genericOAuth:
+      authUrl: {{ spec.oauth_auth_url | yaml_safe }}
+      tokenUrl: {{ spec.oauth_token_url | yaml_safe }}
+      redirectUri: {{ spec.oauth_redirect_uri | yaml_safe }}
+      clientId: {{ spec.oauth_client_id | yaml_safe }}
+      clientSecret: {{ spec.oauth_client_secret | yaml_safe }}
+
+persistence:
+  enabled: true
+  size: {{ storage_size }}
+  # storageClass: "ceph-rbd-platform"
